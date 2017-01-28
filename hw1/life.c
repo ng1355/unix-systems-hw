@@ -8,6 +8,7 @@
 #define DOOMED 'd' 
 #define ISALIVE(neighbor) ((neighbor == '*') || (neighbor == DOOMED))
 
+
 static inline int validateArg(char* arg);
 static inline FILE* validateFile(char* filename);
 static inline char** createGrid(int rows, int cols);
@@ -34,7 +35,7 @@ int main(int argc, char** argv){
 		case 2: rows = validateArg(argv[1]);
 		case 1: break;
 		default: 
-			dprintf(2, "Usage: life rows columns filename generations\n");
+			fprintf(stderr, "Usage: life rows columns filename generations\n");
 			exit(EXIT_FAILURE);
 	}			
 
@@ -163,9 +164,9 @@ void animate(char** grid, int generations, int rows, int cols){
 	}
 
 	cull(grid, rows, cols);
-	usleep(500000); //Not entirely portable as arg is <1000000
-	}}
-
+	sleep(1); //sadly the only fully portable way of sleeping in c99
+	}
+}
 
 //Prints each row of the grid to the console
 //along with a bar to seperate the different generations
