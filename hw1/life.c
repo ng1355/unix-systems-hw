@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+//Cells that will die the following turn are marked DOOMED
+//and dead cells that are to come alive are marked ALIVE
+//ISALIVE checks if the cell is alive, or marked to die the following
+//turn (but still alive as of this turn). 
 #define ALIVE 'a'
 #define DOOMED 'd' 
 #define ISALIVE(neighbor) ((neighbor == '*') || (neighbor == DOOMED))
@@ -35,8 +39,8 @@ int main(int argc, char** argv){
 		case 2: rows = validateArg(argv[1]);
 		case 1: break;
 		default: 
-			fprintf(stderr, "Usage: life rows columns filename generations\n");
-			exit(EXIT_FAILURE);
+		fprintf(stderr, "Usage: life rows columns filename generations\n");
+		exit(EXIT_FAILURE);
 	}			
 
 	//padding the grid to avoid checking out of bounds
@@ -89,7 +93,7 @@ static inline FILE* validateFile(char* filename){
 
 //creates 2D array on the heap, whose length and height
 //is specified with rows and cols by user (default = 10).
-//Also populates grid cells with 'dead' spaces (space character).
+//Also populates grid cells with 'dead' spaces (hyphen character).
 //Each row is null terminated for later printing
 //Cannot fail on its own, thoguh safeMalloc might
 //returns pointer to 'start' of grid.
@@ -129,8 +133,8 @@ static inline void deleteGrid(char** grid, int rows){
 //Stops reading a row early if a newline is encountered. 
 void populateGrid(char** grid, FILE* inputFile, int rows, int cols){
 	char charFromFile;
-	for(int i = 1; i < rows; i++){
-		for(int j = 1; j < cols; j++){
+	for(int i = 1; i < rows - 1; i++){
+		for(int j = 1; j < cols - 1; j++){
 			if((charFromFile = getc(inputFile)) == EOF) return;
 			else if(charFromFile == '\n') break;
 			if(charFromFile == '*'){
@@ -142,15 +146,11 @@ void populateGrid(char** grid, FILE* inputFile, int rows, int cols){
 
 //Scans each 'valid' cell (ignoring perimiter cells)
 //and checks its adjacencies. Acts according to GoL's rules. 
-//Cells that will die the following turn are marked DOOMED
-//and dead cells that are to come alive are marked ALIVE
-//ISALIVE checks if the cell is alive, or marked to die the following
-//turn (but still alive as of this turn). 
 //prints updates to the console with updateDisplay()
 void animate(char** grid, int generations, int rows, int cols){
 	int neighbors;
 
-	for(int genCounter = 0; genCounter < generations; genCounter++){
+	for(int genCounter = 0; genCounter <= generations; genCounter++){
 		updateDisplay(grid, rows, cols, genCounter);
 		for(int i = 1; i < rows - 1; i++){
 			for(int j = 1; j < cols - 1; j++){
@@ -164,24 +164,25 @@ void animate(char** grid, int generations, int rows, int cols){
 	}
 
 	cull(grid, rows, cols);
-	sleep(1); //sadly the only fully portable way of sleeping in c99
+	//sadly the only fully portable way of sleeping in c99
+	//no error checking since timing accuracy isnt important
+	sleep(1); 
 	}
 }
 
 //Prints each row of the grid to the console
 //along with a bar to seperate the different generations
 static inline void updateDisplay(char** grid, int rows, int cols, int generation){
-	printf("Generation %d:\n", generation + 1);
+	printf("Generation %d:\n", generation);
 	for(int i = 1; i < rows - 1; i++)
 		printf("%s\n", grid[i] + 1);
-	for(int i = 1; i < cols - 1; i++) printf("=");
+	for(int i = 1; i < cols; i++) printf("=");
 	printf("\n");
 }
 
 //Scans the grid for cells marked as DOOMED or ALIVE
 //and changes that be a - or *, respectively
-//so that we can update the game state without
-//modifying the grid while also checking for neighbors
+//so the game state can update simultaneously
 void cull(char** grid, int rows, int cols){
 	for(int i = 1; i < rows - 1; i++)
 		for(int j = 1; j < cols - 1; j++)
