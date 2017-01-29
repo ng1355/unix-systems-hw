@@ -68,12 +68,15 @@ int main(int argc, char** argv){
 
 //makes sure numeric command line arguments
 //are indeed numbers or not zero. 
+//Two checks have to be made in case the 0
+//is deliberate or the result of strtol failing
 //returns parsed number or exits process
 static inline int validateArg(char* arg){
 	int number;
-	if((number = strtol(arg, NULL, 0)) == 0){
-		(arg[0] == '0') ? 
-			fprintf(stderr, "Error: Row or column cannot be 0\n")
+	if((number = strtol(arg, NULL, 0)) == 0 || number < 0){
+		(arg[0] == '0' || number < 0) ? 
+			fprintf(stderr, "Error: Row, column," 
+			"or generation cannot be <= 0\n")
 		       	: perror("Error");
 		exit(EXIT_FAILURE);
 	}
