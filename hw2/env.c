@@ -14,7 +14,6 @@ char** concatEnviron(char** userenv, int userenv_size);
 
 static inline void env(int flag, char** argv);
 static inline void* safemalloc(size_t size);
-static inline void freematrix(char** matrix);
 static inline int bufsize(char** buf);
 static inline void printenv(char** userenv);
 
@@ -29,7 +28,7 @@ int main(int argc, char** argv){
 
 	if(bufsize(argv + flag) == 0){
 		printenv(userenv);
-		freematrix(userenv);
+		free(userenv);
 		exit(EXIT_SUCCESS);
 	}
 
@@ -69,7 +68,7 @@ int getuserenv(int flag, char** argv, char** userenv){
 }
 
 char** concatEnviron(char** userenv, int userenv_size){
-	char** newenviron = safemalloc(NEWENV_SIZE);
+	char** newenviron = (char**)safemalloc(NEWENV_SIZE);
 	char** newenvironptr = newenviron;
 	char** environptr = environ;
 	char** userenv_start = userenv;
@@ -78,16 +77,9 @@ char** concatEnviron(char** userenv, int userenv_size){
 	newenviron--;
 	while((*newenviron++ = *userenv++));
 
-	freematrix(userenv_start);
+	free(userenv_start);
 	return newenvironptr;
 }
-
-static inline void freematrix(char** matrix){
-	char** matrix_start = matrix;
-	while(*matrix) free(*matrix++);
-	free(matrix_start);
-}
-
 
 static inline void printenv(char** userenv){
 	while(*userenv) printf("%s\n", *userenv++);
