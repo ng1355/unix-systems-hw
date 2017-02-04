@@ -6,45 +6,55 @@
 extern char** environ;
 
 #define FLAGSET (argc > 1 && !(strncmp(argv[1], "-i", 2)))
+#define NEWENV_SIZE ((bufsize(environ) + userenv_size) * sizeof(char*))
 
-void env(int flag, char** argv);
 int getflag(int argc, char** argv);
 int getuserenv(int flag, char** argv, char** userenv);
 char** concatEnviron(char** userenv, int userenv_size);
 
+static inline void env(int flag, char** argv);
+static inline void* safemalloc(size_t size);
+static inline void freematrix(char** matrix);
 static inline int bufsize(char** buf);
 static inline void printenv(char** userenv);
 
-char** mallocmatrix(int row, int cols);
-void printmatrix(char** matrix);
-
-
 int main(int argc, char** argv){
-	int flag = 0;
+	int flag = getflag(argc, argv);
 
+	char** userenv = (char**)safemalloc(argc * sizeof(char*));
+	int userenv_size = getuserenv(flag, argv, userenv);
+	argv += userenv_size;
+
+	if(!flag) userenv = concatEnviron(userenv, userenv_size);
+
+	if(bufsize(argv + flag) == 0){
+		printenv(userenv);
+		freematrix(userenv);
+		exit(EXIT_SUCCESS);
+	}
+
+	environ = userenv;
+	env(flag, argv);
+}
+
+static inline void env(int flag, char** argv){
+	argv += flag;
+	execvp(*argv, argv);
+
+	perror("env");
+	exit(EXIT_FAILURE);
+}
+
+int getflag(int argc, char** argv){
+	int flag = 0;
 	if(FLAGSET){
 		if(strncmp(argv[1], "-i", 3) != 0){
-			fprintf(stderr, "Invalid argument\n");
+			fprintf(stderr, "env: invalid argument\n");
 			exit(EXIT_FAILURE);
 		}
 		flag = 1;
 	}
-
-	char** userenv = (char**)malloc(argc * sizeof(char*));
-	int userenv_size = getuserenv(flag, argv, userenv);
-	argv += userenv_size;
-
-	userenv = (char**)realloc(userenv, userenv_size);
-	if(!flag) userenv = concatEnviron(userenv, userenv_size);
-
-	environ = userenv;
-
-	if(bufsize(argv + flag) == 0){
-		printenv(userenv);
-		exit(EXIT_SUCCESS);
-	}
-
-	env(flag, argv);
+	return flag;
 }
 
 int getuserenv(int flag, char** argv, char** userenv){
@@ -58,43 +68,38 @@ int getuserenv(int flag, char** argv, char** userenv){
 	return size;	
 }
 
-static inline void printenv(char** userenv){
-	while(*userenv) printf("%s\n", *userenv++);
-}
-
 char** concatEnviron(char** userenv, int userenv_size){
-	char** newenviron = malloc((bufsize(environ) + userenv_size) * sizeof(char*));
+	char** newenviron = safemalloc(NEWENV_SIZE);
 	char** newenvironptr = newenviron;
 	char** environptr = environ;
+	char** userenv_start = userenv;
+
 	while((*newenviron++ = *environptr++));
 	newenviron--;
 	while((*newenviron++ = *userenv++));
 
+	freematrix(userenv_start);
 	return newenvironptr;
 }
 
-void env(int flag, char** argv){
-	argv += flag;
-	if(execvp(*argv, argv) == -1)
-		printf("fail\n");
+static inline void freematrix(char** matrix){
+	char** matrix_start = matrix;
+	while(*matrix) free(*matrix++);
+	free(matrix_start);
 }
 
-char** mallocmatrix(int rows, int cols){
-	char** matrix = malloc(rows * sizeof(char));
-	for(size_t i = 0; i < rows; i++)
-		matrix[i] = malloc(cols * sizeof(char));
-	return matrix;
+
+static inline void printenv(char** userenv){
+	while(*userenv) printf("%s\n", *userenv++);
 }
 
-void freematrix(char** matrix){
-	int size = bufsize(matrix);
-	for(size_t i = 0; i < size; i++)
-		free(matrix[i]);
-	free(matrix);
-}
-
-void printmatrix(char** matrix){
-	while(*matrix) printf("%s\n", *matrix++);
+static inline void* safemalloc(size_t size){
+	void* mem;
+	if((mem = malloc(size)) == NULL){
+		perror("Error");
+		exit(EXIT_FAILURE);
+	}
+	return mem;
 }
 
 static inline int bufsize(char** buf){
