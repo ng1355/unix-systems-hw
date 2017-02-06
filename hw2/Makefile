@@ -1,5 +1,5 @@
 #Makefile for hw1 by Nikita
-FLAGS = -std=c99 -Wall -Werror -pedantic -g
+FLAGS = -std=c99 -Wall -Werror -pedantic
 all: life
 
 life: env.c
