@@ -51,6 +51,10 @@ int main(int argc, char** argv){
 	//execvp can read from it. 
 	environ = userenv;
 	env(flag, argv);
+
+	free(environ);
+	exit(EXIT_FAILURE);
+
 }
 
 /* Sets argv to the first arg following user set env vars
@@ -61,9 +65,8 @@ int main(int argc, char** argv){
 static inline void env(int flag, char** argv){
 	argv += flag;
 	execvp(*argv, argv);
-
 	perror("env: exec");
-	exit(EXIT_FAILURE);
+
 }
 
 /* checks if the first argument is the -i flag 
