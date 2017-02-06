@@ -52,6 +52,8 @@ int main(int argc, char** argv){
 	environ = userenv;
 	env(flag, argv);
 
+	//Cleanup environ (points to malloced userenv) and terminate
+	//incase execvp fails
 	free(environ);
 	exit(EXIT_FAILURE);
 
@@ -61,12 +63,11 @@ int main(int argc, char** argv){
  * first element of argv is the program to execute as well as a pointer
  * to the rest of the arguments for exec
  * exec reclaims all malloced resources so no need to free anything
- * If execvp fails, program prints error and terminates. */
+ * If execvp fails, program prints error and returns. */
 static inline void env(int flag, char** argv){
 	argv += flag;
 	execvp(*argv, argv);
 	perror("env: exec");
-
 }
 
 /* checks if the first argument is the -i flag 
