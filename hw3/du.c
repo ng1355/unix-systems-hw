@@ -4,10 +4,12 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
 char* PROGRAM_NAME;
 
 void du(char* dirname);
+void printdirs(DIR* dir);
 
 static inline DIR* sopendir(char* dirname);
 
@@ -24,10 +26,8 @@ int main(int argc, char** argv) {
 
 void du(char* dirname) {
 	DIR* dir = sopendir(dirname);
-	struct dirent* currdir = readdir(dir);
-	printf("currdir: %s\n", currdir->d_name);
+	printdirs(dir);
 	closedir(dir);
-
 }
 
 static inline DIR* sopendir(char* dirname){
@@ -38,3 +38,18 @@ static inline DIR* sopendir(char* dirname){
 	}
 	return dir;
 }
+
+void printdirs(DIR* dir){
+	struct dirent* currdir;
+	struct stat* buf;
+	while((currdir = readdir(dir)) != NULL){
+
+}
+
+static inline char* absolute_path(char* filename){
+	char path[PATH_MAX];
+	getcwd(
+	if(strnlen(filename, NAME_MAX) + strnlen(path, PATH_MAX) > PATH_MAX)
+		return NULL;
+
+	
