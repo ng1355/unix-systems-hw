@@ -46,10 +46,15 @@ void printdirs(DIR* dir){
 
 }
 
-static inline char* absolute_path(char* filename){
-	char path[PATH_MAX];
-	getcwd(
-	if(strnlen(filename, NAME_MAX) + strnlen(path, PATH_MAX) > PATH_MAX)
-		return NULL;
-
-	
+/* gets canonical path of filename
+ * As of POSIX2008, passing NULL to realpath means path will point to a block
+ * of memory at least PATH_MAX in size, older standard have implimentation
+ * specific effects. Returns a pointer to the malloced path */
+static inline char* getpath(char* filename){
+	char* path;
+	if((path = realpath(filename, NULL)) == NULL){
+		perror(PROGRAM_NAME);
+		exit(EXIT_FAILURE);
+	}
+	return path;
+}
