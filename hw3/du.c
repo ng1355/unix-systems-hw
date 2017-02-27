@@ -33,27 +33,31 @@ int main(int argc, char** argv) {
 int du(char* dirname) {
 	DIR* dir = sopendir(dirname);
 	struct dirent* currdir;
-	struct stat* dirent_data = NULL;
+	struct stat dirent_data;
 	char* fullpath = NULL;
 	int block_count = 0;
 	//walk directory tree
 	while((currdir = readdir(dir)) != NULL){
 	//lstat dirent 
-		fullpath = getpath(currdir->d_name);
+		fullpath = currdir->d_name; // getpath(currdir->d_name);
+		getpath(currdir->d_name);
 //		printf("d_name: %s fullpath: %s\n", currdir->d_name, fullpath);
-		if(lstat(currdir->d_name, dirent_data) != 0){ 
+		if(lstat(currdir->d_name, &dirent_data) != 0){ 
 			puts("lstat error");
 			perror(PROGRAM_NAME);
 			continue;
 		}
+		/*
 	//recurse if its a directory
-		if(S_ISDIR(dirent_data->st_mode)) block_count += du(fullpath);
+		if(S_ISDIR(dirent_data.st_mode)){} //block_count += du(fullpath);
 	//else accumulate blocksize
-		else block_count += dirent_data->st_blksize;
+		else block_count += dirent_data.st_blocks;
+		*/
+		block_count += dirent_data.st_blocks / 2;
 	}
 	//print directory size 
-	printf("%d\t%s", block_count, fullpath);
-	free(fullpath);
+	printf("%d\t%s\n", block_count, fullpath);
+//	free(fullpath);
 	closedir(dir);
 	return block_count;
 }
