@@ -1,17 +1,23 @@
 //du implimentation by Nikita Georgiou
 //Does not use ntfw
+#define _XOPEN_SOURCE
+#define _XOPEN_SOURCE_EXTENDED
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 char* PROGRAM_NAME;
 
-void du(char* dirname);
+int du(char* dirname);
 void printdirs(DIR* dir);
 
 static inline DIR* sopendir(char* dirname);
+static inline char* getpath(char* path);
 
 int main(int argc, char** argv) {
 	PROGRAM_NAME = argv[0];
@@ -24,10 +30,32 @@ int main(int argc, char** argv) {
 	}
 }
 
-void du(char* dirname) {
+int du(char* dirname) {
 	DIR* dir = sopendir(dirname);
-	printdirs(dir);
+	struct dirent* currdir;
+	struct stat* dirent_data = NULL;
+	char* fullpath = NULL;
+	int block_count = 0;
+	//walk directory tree
+	while((currdir = readdir(dir)) != NULL){
+	//lstat dirent 
+		fullpath = getpath(currdir->d_name);
+//		printf("d_name: %s fullpath: %s\n", currdir->d_name, fullpath);
+		if(lstat(currdir->d_name, dirent_data) != 0){ 
+			puts("lstat error");
+			perror(PROGRAM_NAME);
+			continue;
+		}
+	//recurse if its a directory
+		if(S_ISDIR(dirent_data->st_mode)) block_count += du(fullpath);
+	//else accumulate blocksize
+		else block_count += dirent_data->st_blksize;
+	}
+	//print directory size 
+	printf("%d\t%s", block_count, fullpath);
+	free(fullpath);
 	closedir(dir);
+	return block_count;
 }
 
 static inline DIR* sopendir(char* dirname){
@@ -37,13 +65,6 @@ static inline DIR* sopendir(char* dirname){
 		exit(EXIT_FAILURE);
 	}
 	return dir;
-}
-
-void printdirs(DIR* dir){
-	struct dirent* currdir;
-	struct stat* buf;
-	while((currdir = readdir(dir)) != NULL){
-
 }
 
 /* gets canonical path of filename
