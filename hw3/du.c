@@ -2,7 +2,8 @@
 //Does not use ntfw
 //ran out of time teehee
 //i just did so much commenting omg, hardlink counts work!!!!!
-//TODO: cleanup 
+//compiled & works on arch linux
+//TODO: cleanup, find out why segfault happens on mac
 
 #define _XOPEN_SOURCE 500
 #define _POSIX_C_SOURCE 200809L
@@ -54,6 +55,7 @@ int main(int argc, char** argv) {
 		free(inodes);
 		exit(EXIT_FAILURE);
 	}
+	puts("dont executing");
 	delete_inodelist(inodes);
 }
 
@@ -114,7 +116,7 @@ int du(char* basepath, inode_list* inodes){
 	}
 
 	printf("%ld\t%s\n", blockcount, basepath);
-	closedir(dir);
+	closedir(dir); //segfaults on osx, but runs to completion
 	return blockcount;
 }
 
