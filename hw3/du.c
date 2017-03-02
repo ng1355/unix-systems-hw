@@ -138,7 +138,7 @@ int du(char* basepath, inode_list* inodes){
 	}
 
 	printf("%ld\t%s\n", blockcount, basepath);
-	closedir(dir); //segfaults on osx, but runs to completion
+	closedir(dir);
 	return blockcount;
 }
 
