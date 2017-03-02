@@ -16,6 +16,9 @@
 //meant to determine if the length of str1 + str2 exceeds max (ie PATH_MAX)
 #define IS_OVERFLOW(str1, str2, max) (((str1) + (str2)) > (max))
 
+//common comparison that makes ifs long. Checks if dirent's d_name is .
+#define IS_DOTDIR(d_name) ((strnlen((d_name), 2) == 1) && ((d_name)[0] == '.'))
+
 const char* PROGRAM_NAME; //For error printing
 
 /* a simple vector to record encountered inodes
@@ -37,6 +40,8 @@ void delete_inodelist(inode_list* inodes);
 
 static inline void* smalloc(size_t size);
 static inline void* srealloc(void* ptr, size_t size);
+static inline void* scalloc(size_t nemb, size_t size);
+static inline void zero_out(ino_t* inodes, size_t start, size_t end);
 
 int main(int argc, char** argv) {
 	PROGRAM_NAME = argv[0];
@@ -95,11 +100,17 @@ int du(char* basepath, inode_list* inodes){
 		if(((strnlen(dname, 3) == 2) && (strncmp(dname, "..", 2) == 0)))
 			continue;
 
-		/*If there's a record of the inode in the inode list, 
+		/* If there's a record of the inode in the inode list, 
 		 * skip the loop. Otherwise, add it to the list if it's not 
-		 * already there. */ 
-		if(inode_exists(entry->d_ino, inodes)) continue;
-		else add_inode(entry->d_ino, inodes);
+		 * already there. First check is for case where dname
+		 * is "." and must be counted but not checked against
+		 * as this dir's inode is added to the list *before*
+		 * it is recursed into, but doesn't have its size
+		 * (the dir, not its contents) summed until now. */
+		if(!(IS_DOTDIR(dname))){
+			if(inode_exists(entry->d_ino, inodes)) continue;
+			else add_inode(entry->d_ino, inodes);
+		}
 
 		//Append files/directory name to provided dir
 		//check necessary for edgecase where basepath is root ('/')
@@ -118,7 +129,7 @@ int du(char* basepath, inode_list* inodes){
 		//if its a directory but not ".", recurse into it
 		//giving the folder relative to the cwd.
 		if(S_ISDIR(entdata.st_mode)){
-			if(((strnlen(dname, 2) == 1) && (dname[0] == '.')))
+			if(IS_DOTDIR(dname))
 				blockcount += entdata.st_blocks / 2;
 			else
 				blockcount += du(new_path, inodes);
@@ -131,13 +142,14 @@ int du(char* basepath, inode_list* inodes){
 	return blockcount;
 }
 
-//Essentially a constructor for the inode list
-//dynamic array for to store inode numbers, as well as struct itself
-//returns pointer to inode list struct 
+/* Essentially a constructor for the inode list
+ * dynamic array for to store inode numbers, as well as struct itself
+ * note that the dynamic array is calloced, and therefor zeroed out. 
+ * returns pointer to inode list struct */
 inode_list* new_inodelist(size_t capacity){
 	inode_list* inodes;
 	inodes = smalloc(sizeof(inode_list));
-	inodes->inodes = smalloc(capacity * sizeof(ino_t));
+	inodes->inodes = scalloc(sizeof(ino_t), capacity);
 	inodes->capacity = capacity;
 	inodes->size = 0;
 	return inodes;
@@ -152,14 +164,15 @@ int inode_exists(ino_t inode, inode_list* inodes){
 }
 
 //Adds a new inode to the inode list's list. If the list runs out of space,
-//double capacity a la vector (well, not quite) with realloc. 
+//increase capacity a la vector with realloc. 
 void add_inode(ino_t inode, inode_list* inodes){
 	if(inodes->size == inodes->capacity){
 		inodes->inodes = srealloc(inodes->inodes, 
-				 sizeof(ino_t) * inodes->capacity * 1.5);
-		inodes->capacity *= 1.5;
+				 sizeof(ino_t) * inodes->capacity * 2);
+		inodes->capacity *= 2;
+		zero_out(inodes->inodes, inodes->size, inodes->capacity);
 	}
-	inodes->inodes[inodes->size += 1] = inode;
+	inodes->inodes[inodes->size++] = inode;
 }
 
 //destructor 
@@ -185,4 +198,18 @@ static inline void* srealloc(void* ptr, size_t size){
 		exit(EXIT_FAILURE);
 	}
 	return ptr;
+}
+
+/* callocs or dies trying. Note that this nemb & size cannot be zero */
+static inline void* scalloc(size_t nemb, size_t size){
+	void* mem;
+	if((mem = calloc(nemb, size)) == NULL){
+		perror(PROGRAM_NAME);
+		exit(EXIT_FAILURE);
+	}
+	return mem;
+}
+
+static inline void zero_out(ino_t* inodes, size_t start, size_t end){
+	while(start != end) inodes[start++] = (ino_t) 0;
 }
