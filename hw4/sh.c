@@ -9,7 +9,6 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <stdlib.h>
 
 #define MAX_STDINPUT 1024 
 
@@ -21,9 +20,13 @@ const char* PROGRAM_NAME;
 
 void sh();
 int exec_fork(char** arglist);
-int redir(char* file1, char* flle2, char arrow);
-size_t tokenize(char* input, char** arglist);
+int redir(char** arglist, char* flle2, char arrow);
+char** tokenize(char* input);
 void cd(char* dir);
+
+static inline void* smalloc(size_t size);
+static inline void free_args(char** arglist);
+static inline char* strstrchr(char* str, const char* delim);
 
 int main(int argc, char** argv){
 	PROGRAM_NAME = argv[0];
@@ -36,8 +39,8 @@ void printbuf(char** buf){
 }
 
 void sh(){
-	char input[MAX_STDINPUT];
-	char* arglist[ARG_MAX];
+	char input[ARG_MAX];
+	char** arglist = NULL;
 	char* default_ps1 = ">>";
 	char* ps1;
 
@@ -47,24 +50,23 @@ void sh(){
 
 	while(1){
 		printf("%s", ps1);
-		if(fgets(input, MAX_STDINPUT, stdin) == NULL){
+		if(fgets(input, ARG_MAX, stdin) == NULL){
 			perror(PROGRAM_NAME);
 			continue;
 		}
 
-		if(tokenize(input, arglist) == 0) continue;
+		if((arglist = tokenize(input)) == NULL) continue;
 
 		if(strncmp(arglist[0], "cd", 2) == 0){ 
 			cd(arglist[1]);
+			free_args(arglist);
 			continue;
 		}
 		else if(strncmp(arglist[0], "exit", 4) == 0)
 			exit(EXIT_SUCCESS);
 
-		/* if((strchr(input, '>') != NULL) || (strchr(input, '<') != NULL)){
-			redir(
-			*/
-		if(exec_fork(arglist) == -1) continue;
+		exec_fork(arglist);
+		free_args(arglist);
 	}
 
 }
@@ -85,7 +87,7 @@ int exec_fork(char** arglist){
 		perror(PROGRAM_NAME);
 		return -1;
 	}
-	wait(0);
+	else wait(0);
 	return 0;
 }
 
@@ -111,39 +113,82 @@ void cd(char* dir){
 	if(pwd_ptr != NULL) setenv("PWD", pwd, 1);
 }
 
-void eval_args(char** arglist){
-i	while(*args){
-		if(strcmp	
-
 /* IO redirection, redir is either < or > 
  * output < input reads input from file to prog's stdin
  * prog > file writes output from prog to file from stdout */
-int redir(char* prog, char* filename, char arrow){
+int redir(char** arglist, char* filename, char arrow){
 	FILE* file = fopen(filename, "w");
-	if(arrow == '>'){
-		dup2(1, fileno(file));
-//		exec_fork(prog);
+	pid_t pid = fork();
+
+	if(pid == 0){
+		if(arrow == '>'){
+			dup2(1, fileno(file));
+		}
+		else if(arrow == '<'){
+			dup2(0, fileno(file));
+		}
+		execvp(arglist[0], arglist);
 	}
-	else if(arrow == '<'){
-		dup2(0, fileno(file));
-//		exec_fork(prog)
+	else if(pid < 0){
+		perror(PROGRAM_NAME);
+		_Exit(EXIT_FAILURE);
 	}
+	else wait(0);
 	return 0;
 }
 
 /* Splits single input string into array of strings delimited by space. 
  * also strips trailing newline appended by fgets. Appends null for exec. 
  * returns number of tokenized strings in input. */ 
-size_t tokenize(char* input, char** arglist){
-	size_t index = 0;
-	char* token, *redir;
+char** tokenize(char* input){
+	size_t index = 0, size = 10;
+	char** arglist;
+	char* token, *redirtok;
 
-	if(input[0] == '\n') return 0;
+	if(input[0] == '\n') return NULL;
 
-	while((index < ARG_MAX) && (token = strtok_r(input, " \n", &input))){
-		arglist[index++] = token;
+	if((arglist = malloc(size * sizeof(char*))) == NULL){
+		perror(PROGRAM_NAME);
+		return NULL;
 	}
-	
+
+	while((token = strtok_r(input, " \n", &input))){
+		if(index == size){
+			if((realloc(arglist, size *= 2)) == NULL){
+				perror(PROGRAM_NAME);
+				return NULL;
+			}
+		}
+		arglist[index++] = strdup(token);
+	}
+	if((redirtok = strchrchr(`
 	arglist[index++] = (char*) 0;	
-	return index;
+	return arglist;
+}
+
+static inline void* smalloc(size_t size){
+	void* mem;
+	if((mem = malloc(size)) == NULL){
+		perror(PROGRAM_NAME);
+		exit(EXIT_FAILURE);
+	}
+	return mem;
+}
+
+static inline void free_args(char** arglist){
+	char** arglist_start = arglist;
+	while(*arglist) free(*arglist++);
+	free(arglist_start);
+}
+
+/* returns pointer to first instance of any of the chars in delim 
+ * else returns null */ 
+static inline char* strstrchr(char* str, const char* delim){
+	while(*delim != '\0'){
+		while(*str != '\0'){
+			if(*str++ == *delim) return str;
+		}
+		delim++;
+	}
+	return NULL;
 }
