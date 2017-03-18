@@ -23,15 +23,18 @@ const char* PROGRAM_NAME;
 #define STREQ(str1, str2, max) (!(strncmp((str1), (str2), (max))) && \
 				(strnlen((str1), (max) + 1) == strnlen((str2),\
 				(max) + 1)))
+
 void sh(int argc);
 void exec_fork(char** arglist);
-int redir(char** arglist, char* flle2, char arrow);
+int redir(char** arglist, char* flle2, char* arrow);
 char** tokenize(char* input);
 void cd(char* dir);
 void eval_args(char** arglist);
+char** fmt_redir(char** arglist, char** redir, size_t size);
 
 static inline void printerr(char* failed_arg);
 static inline char chrchr(char* str, const char* delim);
+static inline size_t bufsize(char** buf);
 
 int main(int argc, char** argv){
 	PROGRAM_NAME = argv[0];
@@ -90,21 +93,26 @@ void exec_fork(char** arglist){
 }
 
 /* iterates over arglist tokenized by sh() and scans for redirection symbols
- * (ie ><|) "start" will be used to keep track of multiple commands when pipes
- * are implimented, but is currently useless */ 
+ * a token is assumed to be immediately followed by a filename. */
 void eval_args(char** arglist){
-	char** start = arglist;
+	char** start = arglist, **newlist;
 	char redirtok;
 
 	while(*arglist){
-		if((redirtok = chrchr(*arglist, "<>|")) != (char) NULL){
-			*arglist = (char*) NULL;
+		if((redirtok = chrchr(*arglist, "<>")) != (char) NULL){
 			if(*(arglist + 1) == (char*) NULL){
 				fprintf(stderr, "%s: syntax error near token"
-					" %c\n", PROGRAM_NAME, redirtok);
+					" %s\n", PROGRAM_NAME, *arglist);
 				return;
 			}
-			redir(start, *(arglist + 1), redirtok);
+			if((newlist = 
+			   fmt_redir(start, arglist, bufsize(start))) == NULL){
+				printerr("malloc");
+				return;
+			}
+			redir(newlist, *(arglist + 1), *arglist);
+			free(newlist);
+			*arglist = (char*) NULL;
 			start = ++arglist;
 		}
 		else arglist++;
@@ -112,53 +120,52 @@ void eval_args(char** arglist){
 	exec_fork(start);
 }
 
-/* changes shell's cwd to dir or prints error and does notthing. 
- * A successful directory change will attempt to create or set the pwd/oldpwd
- * env vars, but there is no guarintee setenv or realpath will succeed
- * and no check for their failure */ 
-void cd(char* dir){
-	/* conflicting documentation: Darwin's manpage says realpath uses
-	 * PATH_MAX as a lower limit, but man7 and manpages on my linux distro
-	 * say its an upper limit. */ 
-	char pwd[PATH_MAX];
-	char oldpwd[PATH_MAX];
-	char* pwd_ptr, *oldpwd_ptr;
-
-	//need to do this or Werror yells about unused returns
-	oldpwd_ptr = realpath(".", oldpwd);
-
-	if(STREQ(dir, "~", 1)){
-		if((pwd_ptr = getenv("HOME")) == NULL) return;
+/* mallocs a new char** that holds all non-redirection tokens from arglist
+ * this is used rearrange oddly placed tokens into a format redir() understands
+ */
+char** fmt_redir(char** arglist, char** redir,  size_t size){
+	char** newlist, **newlist_start;
+	if((newlist = malloc((size - 2) * sizeof(char*))) == NULL)
+		return (char**) NULL;
+	newlist_start = newlist;
+	while(*arglist){
+		if((*arglist == *redir) || (*arglist == *(redir + 1))){
+			arglist++;
+			continue;
+		}
+		*(newlist++) = *(arglist++);
 	}
-	else pwd_ptr = realpath(dir, pwd);
-
-	if(chdir(pwd_ptr) == -1){
-		printerr(dir);
-		return;
-	}
-	
-	if(oldpwd_ptr != NULL) setenv("OLDPWD", oldpwd, 1);
-	if(pwd_ptr != NULL) setenv("PWD", pwd, 1);
+	*newlist = (char*) NULL;
+	return newlist_start;
 }
 
 /* IO redirection, redir is either < or > 
  * output < input reads input from file to prog's stdin
  * prog > file writes output from prog to file from stdout */
-int redir(char** arglist, char* filename, char arrow){
+int redir(char** arglist, char* filename, char* arrow){
 	FILE* file;
-	pid_t pid = fork();
-	if((file = fopen(filename, (arrow == '>') ? "w" : "r")) == NULL){
+	int fd;
+	char *endptr, *mode;
+
+	/* interestingly, the number before a token can be used to specify
+	 * an arbitrary file descriptor */ 
+	if((fd = strtol(arrow, &endptr, 0)) == 0)
+		fd = (endptr[0] == '<') ? 0 : 1;
+	else if(fd < 0) fprintf(stderr, "%s: bad fd for redirection\n", 
+			PROGRAM_NAME);
+
+	if(strncmp(endptr, ">>", 2) == 0) mode = "a";
+	else mode = (endptr[0] == '<') ? "r" : "w"; //possibly redundant
+
+	if((file = fopen(filename, mode)) == NULL){
 		printerr(filename);
 		return -1;
 	}
 
+	pid_t pid = fork();
+
 	if(pid == 0){
-		if(arrow == '>'){
-			dup2(fileno(file),1);
-		}
-		else if(arrow == '<'){
-			dup2(fileno(file),0);
-		}
+		dup2(fileno(file), fd);
 		execvp(arglist[0], arglist);
 		printerr("exec");
 		_exit(EXIT_FAILURE);
@@ -170,6 +177,7 @@ int redir(char** arglist, char* filename, char arrow){
 	else wait(0);
 	return 0;
 }
+
 
 /* Splits single input string into array of strings delimited by space. 
  * also strips trailing newline appended by fgets. Appends null for exec. 
@@ -201,21 +209,55 @@ char** tokenize(char* input){
 	return arglist;
 }
 
+/* changes shell's cwd to dir or prints error and does notthing. 
+ * A successful directory change will attempt to create or set the pwd/oldpwd
+ * env vars, but there is no guarintee setenv or realpath will succeed
+ * and no check for their failure */ 
+void cd(char* dir){
+	/* conflicting documentation: Darwin's manpage says realpath uses
+	 * PATH_MAX as a lower limit, but man7 and manpages on my linux distro
+	 * say its an upper limit. */ 
+	char pwd[PATH_MAX];
+	char oldpwd[PATH_MAX];
+	char* pwd_ptr, *oldpwd_ptr;
+
+	//need to do this or Werror yells about unused returns
+	oldpwd_ptr = realpath(".", oldpwd);
+
+	if(STREQ(dir, "~", 1)){
+		if((pwd_ptr = getenv("HOME")) == NULL) return;
+	}
+	else pwd_ptr = realpath(dir, pwd);
+
+	if(chdir(pwd_ptr) == -1){
+		printerr(dir);
+		return;
+	}
+	
+	if(oldpwd_ptr != NULL) setenv("OLDPWD", oldpwd, 1);
+	if(pwd_ptr != NULL) setenv("PWD", pwd, 1);
+}
+
 /* nicer than perror */ 
 static inline void printerr(char* failed_arg){
 	fprintf(stderr, "%s: %s: %s\n", PROGRAM_NAME, failed_arg,
 			strerror(errno));
 }
 
-/* checks if str is a single character string, then checks if that character
- * is any of the ones specified in delim. returns first cound character on
- * success, null on failure */ 
+/* checks if the trailing non-null character of string str is any char in delim
+ * returns first char that matches, else returns null */ 
 static inline char chrchr(char* str, const char* delim){
-	if(strnlen(str, 2) != 1) return (char) NULL;
-
+	size_t size = strlen(str); //replace with strnlen
 	while(*delim){
-		if(str[0] == *delim) return str[0];
+		if(str[size - 1] == *delim) return str[size - 1];
 		delim++;
 	}
 	return (char) NULL;
+}
+
+//gets number of items pointed by char** buf
+static inline size_t bufsize(char** buf){
+	size_t size = 0;
+	while(*buf++) size++;
+	return size;
 }
