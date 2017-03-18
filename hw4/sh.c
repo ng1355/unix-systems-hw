@@ -116,7 +116,8 @@ void eval_args(char** arglist){
 			redir_fork(newlist, *(arglist + 1), *arglist);
 			free(newlist);
 			*arglist = (char*) NULL;
-			start = ++arglist;
+			start = (arglist + 2);
+			arglist++;
 		}
 		else arglist++;
 	}
