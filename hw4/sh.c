@@ -1,5 +1,5 @@
-/* Shell implimentation by Nikita Georgiou i
- * TODO: cleanup, run thru valgrind, fix forking problems */ 
+/* Shell implimentation by Nikita Georgiou 
+ * TODO: eliminate  redundancy, cleanup spaghett, impliment redir chaining */ 
 
 #define _XOPEN_SOURCE 600
 #define _POSIX_C_SOURCE 200809L
@@ -24,9 +24,10 @@ const char* PROGRAM_NAME;
 				(strnlen((str1), (max) + 1) == strnlen((str2),\
 				(max) + 1)))
 
-void sh(int argc);
+void sh();
 void exec_fork(char** arglist);
-int redir(char** arglist, char* flle2, char* arrow);
+void redir(char** arglist, char* flle2, char* arrow);
+void redir_fork(char** arglist, char* flle2, char* arrow);
 char** tokenize(char* input);
 void cd(char* dir);
 void eval_args(char** arglist);
@@ -38,12 +39,12 @@ static inline size_t bufsize(char** buf);
 
 int main(int argc, char** argv){
 	PROGRAM_NAME = argv[0];
-	sh(argc);
+	sh();
 }
 
 /* Interactive part of the interative shell. Driver function for eval_args, 
  * handles some edge cases (empty user input and shell builtin functions) */
-void sh(int argc){
+void sh(){
 	char input[ARG_MAX];
 	char** arglist = NULL;
 	char* default_ps1 = ">>";
@@ -62,12 +63,14 @@ void sh(int argc){
 		if((arglist = tokenize(input)) == NULL) continue;
 
 		if(STREQ(arglist[0], "cd", 2)){ 
-			(argc > 1) ? cd(arglist[1]) : cd("~");
+			(bufsize(arglist) > 1) ? cd(arglist[1]) : cd("~");
 			free(arglist);
 			continue;
 		}
-		else if(STREQ(arglist[0], "exit", 4))
+		else if(STREQ(arglist[0], "exit", 4)){
+			free(arglist);
 			exit(EXIT_SUCCESS);
+		}
 
 		eval_args(arglist);
 		free(arglist);
@@ -99,7 +102,7 @@ void eval_args(char** arglist){
 	char redirtok;
 
 	while(*arglist){
-		if((redirtok = chrchr(*arglist, "<>")) != (char) NULL){
+		if((redirtok = chrchr(*arglist, "<>")) != '\0'){
 			if(*(arglist + 1) == (char*) NULL){
 				fprintf(stderr, "%s: syntax error near token"
 					" %s\n", PROGRAM_NAME, *arglist);
@@ -110,7 +113,7 @@ void eval_args(char** arglist){
 				printerr("malloc");
 				return;
 			}
-			redir(newlist, *(arglist + 1), *arglist);
+			redir_fork(newlist, *(arglist + 1), *arglist);
 			free(newlist);
 			*arglist = (char*) NULL;
 			start = ++arglist;
@@ -125,7 +128,7 @@ void eval_args(char** arglist){
  */
 char** fmt_redir(char** arglist, char** redir,  size_t size){
 	char** newlist, **newlist_start;
-	if((newlist = malloc((size - 2) * sizeof(char*))) == NULL)
+	if((newlist = malloc((size - 1) * sizeof(char*))) == NULL)
 		return (char**) NULL;
 	newlist_start = newlist;
 	while(*arglist){
@@ -135,49 +138,56 @@ char** fmt_redir(char** arglist, char** redir,  size_t size){
 		}
 		*(newlist++) = *(arglist++);
 	}
-	*newlist = (char*) NULL;
+	*newlist = *arglist;
 	return newlist_start;
 }
 
-/* IO redirection, redir is either < or > 
- * output < input reads input from file to prog's stdin
- * prog > file writes output from prog to file from stdout */
-int redir(char** arglist, char* filename, char* arrow){
+/* driver function for redir, does the same thing as exec_fork but assumes 
+ * redirection will be performed, and calls redir() in the child */
+void redir_fork(char** arglist, char* filename, char* arrow){
+	pid_t pid = fork();
+
+	if(pid == 0){
+		redir(arglist, filename, arrow);
+		_exit(EXIT_FAILURE);
+	}
+	else if(pid < 0){
+		printerr("fork");
+		return;
+	}
+	else wait(0);
+}
+
+/* performs io redirection by either > < or >>. tokens can be preceded by 
+ * a number specifying which descriptor to read/write from. fork()s and replaces
+ * child with program being run, using dup2 to control what happens to stdin 
+ * and out. returns on failure. */
+void redir(char** arglist, char* filename, char* arrow){
 	FILE* file;
 	int fd;
-	char *endptr, *mode;
-
-	/* interestingly, the number before a token can be used to specify
-	 * an arbitrary file descriptor */ 
+	char* endptr, *mode;
+	/* interestingly, the number before a token can be used to
+	 * specify an arbitrary file descriptor */ 
 	if((fd = strtol(arrow, &endptr, 0)) == 0)
 		fd = (endptr[0] == '<') ? 0 : 1;
-	else if(fd < 0) fprintf(stderr, "%s: bad fd for redirection\n", 
-			PROGRAM_NAME);
+	else if(fd < 0){
+		fprintf(stderr, "%s: bad fd for redirection\n", 
+				PROGRAM_NAME);
+		return;
+	}
 
 	if(strncmp(endptr, ">>", 2) == 0) mode = "a";
 	else mode = (endptr[0] == '<') ? "r" : "w"; //possibly redundant
 
 	if((file = fopen(filename, mode)) == NULL){
 		printerr(filename);
-		return -1;
+		return;
 	}
 
-	pid_t pid = fork();
-
-	if(pid == 0){
-		dup2(fileno(file), fd);
-		execvp(arglist[0], arglist);
-		printerr("exec");
-		_exit(EXIT_FAILURE);
-	}
-	else if(pid < 0){
-		printerr("fork");
-		exit(EXIT_FAILURE);
-	}
-	else wait(0);
-	return 0;
+	dup2(fileno(file), fd);
+	execvp(arglist[0], arglist);
+	fclose(file);
 }
-
 
 /* Splits single input string into array of strings delimited by space. 
  * also strips trailing newline appended by fgets. Appends null for exec. 
@@ -211,8 +221,8 @@ char** tokenize(char* input){
 
 /* changes shell's cwd to dir or prints error and does notthing. 
  * A successful directory change will attempt to create or set the pwd/oldpwd
- * env vars, but there is no guarintee setenv or realpath will succeed
- * and no check for their failure */ 
+ * env vars, but there is no guarintee setenv will succeed
+ * and no check for its failure */ 
 void cd(char* dir){
 	/* conflicting documentation: Darwin's manpage says realpath uses
 	 * PATH_MAX as a lower limit, but man7 and manpages on my linux distro
@@ -227,7 +237,10 @@ void cd(char* dir){
 	if(STREQ(dir, "~", 1)){
 		if((pwd_ptr = getenv("HOME")) == NULL) return;
 	}
-	else pwd_ptr = realpath(dir, pwd);
+	else if((pwd_ptr = realpath(dir, pwd)) == NULL){
+		printerr(dir);
+		return;
+	}
 
 	if(chdir(pwd_ptr) == -1){
 		printerr(dir);
@@ -252,7 +265,7 @@ static inline char chrchr(char* str, const char* delim){
 		if(str[size - 1] == *delim) return str[size - 1];
 		delim++;
 	}
-	return (char) NULL;
+	return '\0';
 }
 
 //gets number of items pointed by char** buf
