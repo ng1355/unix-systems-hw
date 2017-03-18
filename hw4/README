@@ -1,0 +1,2 @@
+redirection chaining (ie ls > test > test2 >> test3) currently does not work
+and will result in a fopen error
