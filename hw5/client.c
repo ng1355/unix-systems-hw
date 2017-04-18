@@ -1,28 +1,47 @@
 #include <stdio.h>
 #include <sys/socket.h>
+#include "communication.h"
+#include "common.h"
 
-int main(){
-	char ip[15], uname[16];
-	int port;
+const char *PROGRAM_NAME;
+
+void config(char *addr, uint16_t *port, char *uname);
+
+int main(int argc, char** argv){
+	(void) argc;
+	PROGRAM_NAME = argv[0];
+
+	int sock;
+	char ip[ADDR_SIZE], uname[UNAME_SIZE];
+	uint16_t  port;
 	/* read username, ip, and port from user */
-	config(uname, ip, port);
+	config(ip, &port, uname);
 	/* set up socket to connect to server */ 
-	connect();
+	if((sock = client_socket_setup(ip, port)) < 0) exit(EXIT_FAILURE);
+
 	/* send msg to server from stdin, echo own msg & other msgs to stdout */
-	communicate();
+	puts("Connected, happy chatting!");
+	chat(sock, uname);
 }
 
-void config(char *uname, char *ip, int *port){
-	printf("Enter username: ");
-	fgets(uname, 16, stdin);
-	printf("Enter host address: ");
-	fgets(ip, 15, stdin);
-        fgets	
-}
-
-void prompt(char *prompt, char *buf, int size){
+void config(char *addr, uint16_t *port, char *uname){
+	char portstr[6];
 	while(1){
-		printf("%s", prompt);
-		if(fgets(buf, size, stdin) == NULL){
+		printf("Enter a username (16 chars max): ");
+		if(psgets(uname, UNAME_SIZE + 1) < 1) continue;
+		printf("Enter an IPv4 address: ");
+		if(psgets(addr, UNAME_SIZE + 1) < 0) continue;
+		printf("Enter port number: ");
+		if(psgets(portstr, PORT_SIZE + 1) < 0 || 
+			(*port = parse_port(portstr))
+					< 0) continue;
+		break;
+	}
 
+	strtok(uname, "\n");
+	strtok(addr, "\n");
 
+	if(strncmp(addr, "localhost", 9) == 0 || addr[0] == '\n')
+		strncpy(addr, "127.0.0.1", 10);
+
+}

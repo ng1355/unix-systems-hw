@@ -1,53 +1,50 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+#include "communication.h"
+#include "common.h"
 
-#define PORT_MAX 65535
-#define PORT_MIN 
+const char *PROGRAM_NAME;
+extern int errno;
 
+void config(uint16_t *port, char *uname);
 
-int main(){
-	int addr, port, sock;
-	char *uname;
+int main(int argc, char** argv){
+	(void) argc; 
+	PROGRAM_NAME = argv[0];
+
+	int sock, clientsock;
+	uint16_t port;
+	char uname[UNAME_SIZE];
+
 	/* configure settings from command line */ 
-	config(&addr, &port, uname);
+	config(&port, uname);
+
 	/* set up sockety stuff */ 
-	socket_setup();
-	/* main loop, listen for a client, talk to them upon connection
-	 * and resume listening if client dcs */ 
-	while(!done){
-		listen();
-		done = chat();
+	if((sock = server_socket_setup(port)) < 0) exit(EXIT_FAILURE);
+
+	if(listen(sock, BACKLOG_MAX) < 0){
+		fprintf(stderr, "%s: failed to listen\n", PROGRAM_NAME);
+		exit(EXIT_FAILURE);
+	}
+
+	/* main loop, accepts an incoming connection, chats, then resumes
+	 * waiting for subseqeuent clients */ 
+	while(1){
+		puts("Waiting for connections...");
+		if((clientsock = establish_client(sock)) < 0) exit(EXIT_FAILURE);
+		puts("Connection accepted! You are now chatting.");
+		chat(clientsock, uname);
 	}
 }
 
-void config(char *addr, int *port, char *uname){
+void config(uint16_t *port, char *uname){
 	char portstr[6];
 	while(1){
 		printf("Enter a username (16 chars max): ");
-		if(psgets(uname, 16) < 0) continue;
-		printf("Enter IP address; ");
-		if(psgets(addr, 16) < 0) continue;
+		if(psgets(uname, UNAME_SIZE + 1) < 0) continue;
 		printf("Enter port number: ");
-		if(psgets(portstr, 5) < 0) continue;
+		if(psgets(portstr, PORT_SIZE + 1) < 0 || 
+			(*port = parse_port(portstr))
+					< 0) continue;
+		break;
 	}
-	port = strtol(portstr, NULL, 0);	
+	strtok(uname, "\n");
 }
-
-static inline int psgets(char *buf, size_t size){
-	int n;
-	char *readstr;
-	readstr = fgets(buf, size, stdin);
-	if(readstr == NULL){
-		fprintf(stderr, "%s: Error reading from stdin.\n", 
-				PROGRAM_NAME);
-		return -1;
-	}
-	strtok(readstr, "\n");
-	return strnlen(readstr, size) - 1;
-}
-
-static inline int validate_port(char *port){
-	int portno = strtol(port, NULL, 0);
-	if(portno < 1 || portno > 
