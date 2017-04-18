@@ -14,13 +14,13 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#define UNAME_SIZE 16
-#define ADDR_SIZE 16
-#define PORT_SIZE 5
-#define PORT_MAX 65535
-#define PORT_MIN 1
-#define BACKLOG_MAX 5
-#define MSG_MAX 256
+#define UNAME_SIZE 16 /* arbitrary, username length */
+#define ADDR_SIZE 15 /* abc.def.ghi.jkl = 15 */
+#define PORT_SIZE 5 /* 2 byte number can have up to 5 digits (see PORT_MAX) */
+#define PORT_MAX 65535 /* upper bound of uint16_t */ 
+#define PORT_MIN 1 /* lower bound + 1 */
+#define BACKLOG_MAX 5 /* arbitrary, for listen's backlog option */ 
+#define MSG_MAX 256 /* arbitrary, for message length, incl. uname + formatting */
 
 /* ***************************************************************************
  * The following functions establish socket stuff, create structs, etc. 

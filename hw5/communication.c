@@ -15,12 +15,12 @@ void chat(int sock, char *uname){
 		FD_ZERO(&input);
 		FD_SET(sock, &input);
 		FD_SET(fileno(stdin), &input);
+		fflush(stdout);
 
 		/* Clear msg incase input is terminated abruptly, 
 		 * flush stdout because sockets tends to not play nice
 		 * with buffered outputs (printf) */ 
 		memset(msg, 0, MSG_MAX);
-		fflush(stdout);
 
 		if(pselect(sock + 1, &input, NULL, NULL, NULL, NULL) < 0){
 			fprintf(stderr, "%s: Select error\n", PROGRAM_NAME);
@@ -66,7 +66,6 @@ int send_to_client(int sock, char *uname, char *msg, size_t size){
 	int nbytes;
 
 	psgets(msg, size);
-	fflush(stdout);
 
 	/* The username is appended to the beginning of each message
 	 * this could be made more stateful by having an initial "handshake"

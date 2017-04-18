@@ -46,11 +46,11 @@ void config(uint16_t *port, char *uname){
 	int port_test;
 
 	while(1){
-		/* macro size + 1 to accomodate the newline and null bit */ 
+		/* PAD to accomodate the newline and null bit */ 
 		printf("Enter a username (16 chars max): ");
-		if(psgets(uname, UNAME_SIZE + 1) < 0) continue;
+		if(psgets(uname, UNAME_SIZE + PAD) < 0) continue;
 		printf("Enter port number (Leave blank for any port): ");
-		if(psgets(portstr, PORT_SIZE + 1) < 0 || 
+		if(psgets(portstr, PORT_SIZE + PAD) < 0 || 
 			(port_test =  parse_port(portstr)) < 0) continue;
 		break;
 	}

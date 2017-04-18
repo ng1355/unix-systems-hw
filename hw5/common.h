@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define PAD 2 /* padding for char bufs from stdin, accomodates newline and \0 */
+
 /* Reads input from stdin into buf of up to size bytes. Input longer
  * than size is truncated to size - 1 (excluding null terminator).
  * Returns the number of bytes read, or -1 on error. Also prints error msg
