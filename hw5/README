@@ -1,0 +1,20 @@
+HW5 by Nikita Georgiou
+
+The purpose of this project is to impliment a simple chat between a client and
+a server. The server asks the user to provide a username to chat with and an
+optional port to bind to. It then waits for a client to connect, and chats with
+them. If the client disconnects or is unreachable for whatever reason, the
+server resumes listening for more clients. 
+
+The client similarly asks for a username and port, but also asks for an
+address to connect to, defaulting to localhost. The port field, while not 
+intentional, can also be left blank. This will almost guarintee a failure
+to connect to the server, however. 
+
+The communication library defines a set of functions for the client and server
+to use. Since their codebase has plenty of overlap, both programs share
+one header file for intercommunication. Server or client specific functions
+are made evident by their name scheme, eg "server_socket_setup."
+
+the common library defines (currently one) general purpose helper functions 
+useful for homework. 
