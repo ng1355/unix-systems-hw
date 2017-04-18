@@ -1,3 +1,5 @@
+/* Implimentation file for communication.h by Nikita Georgiou */ 
+
 #include "communication.h"
 #include "common.h"
 
@@ -41,7 +43,7 @@ void chat(int sock, char *uname){
 
 int read_from_client(int sock, char *msg, size_t size){
 	int bytesread;
-	fpurge(stdin); 
+	__fpurge(stdin); /* apparently Linux doesn't suport fpurge? */ 
 
 	if((bytesread = read(sock, msg, size)) == 0){
 		/* the connection has been terminated nicely by the client */
@@ -136,7 +138,7 @@ int client_socket_setup(char *ip, uint16_t port){
 	client.sin_family = AF_INET;
 	client.sin_port = htons(port);
 
-	if(inet_aton(ip, &client.sin_addr) == 0){
+	if(inet_pton(AF_INET, ip, &client.sin_addr) == 0){
 		fprintf(stderr, "%s: Failed to parse IP\n", PROGRAM_NAME);
 		return -1;
 	}
@@ -149,12 +151,16 @@ int client_socket_setup(char *ip, uint16_t port){
 	return sock;
 }
 
-uint16_t parse_port(char *portstr){
+int parse_port(char *portstr){
+	/* "0" here can mean two things: the user left the "port" option
+	 * blank (inputting a newline), meaning the server can bind itself
+	 * to any port, or the string is in a format strtol doesnt understand
+	 * failing the port range check and returning an error */ 
 	if(portstr[0] == '\n') return 0;
 	int port = strtol(portstr, NULL, 0);
 	if(port > PORT_MAX || port < PORT_MIN){
 		fprintf(stderr,"%s: Invalid port.\n", PROGRAM_NAME);
 		return -1;
 	}
-	return (uint16_t) port;
+	return port;
 }

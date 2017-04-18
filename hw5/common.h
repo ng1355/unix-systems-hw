@@ -1,7 +1,10 @@
+/* Useful functions for homework by Nikita Georgiou  */ 
+
 #ifndef NIKITA_COMMON_H
 #define NIKITA_COMMON_H
 
 #include <stdio.h>
+#include <stdio_ext.h> /* __fpurge */ 
 #include <string.h>
 
 /* Reads input from stdin into buf of up to size bytes. Input longer

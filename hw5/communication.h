@@ -1,7 +1,11 @@
+/* Header file for communication functions by Nikita Georgiou.
+ * Use in conjunction with server.c and client.c */ 
+
 #ifndef NIKITA_COMMUNICATION_H
 #define NIKITA_COMMUNICATION_H
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -19,6 +23,11 @@
 #define BACKLOG_MAX 5
 #define MSG_MAX 256
 
+/* ***************************************************************************
+ * The following functions establish socket stuff, create structs, etc. 
+ * necessary for communication
+ * **************************************************************************/
+
 /* takes a port and binds a socket for a server to listen on. Socket is of
  * type IPv4 and TCP, running on any address (INADDR_ANY). Returns socket fd
  * or -1 on error. */ 
@@ -34,11 +43,13 @@ int client_socket_setup(char *ip, uint16_t port);
 int establish_client(int);
 
 /* takes a port number as a char* and parses it into an int. The port is
- * then checked to be within the range of a 16 bit number, returning -1 if not
- * valid port numbers are cast to 16 bits and returned. Non-numeric chars
- * are ignored. If the provided string is unparseable (no numeric chars), 
- * then the function fails, returning -1. */ 
-uint16_t parse_port(char*);
+ * then checked to be within the range of an unsigned 16 bit number, returning 
+ * -1 if not. Non-numeric chars are ignored. If the provided string is  
+ * unparseable (no numeric chars), then the function fails, returning -1. 
+ * Note that the return type is expected to be checked by the caller for -1
+ * before safely being cast into something like a uint16_t, as non-erronious
+ * returns are guarinteed to be within this range. */ 
+int parse_port(char*);
 
 /* ***************************************************************************
  * The following functions deal with sending and recieving data

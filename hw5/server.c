@@ -1,3 +1,9 @@
+/* Server code by Nikita Georgiou
+ * Hosts a server on user specified port with a chosen username.
+ * the server will listen for incoming connections, and chat with the first
+ * one to connect. If the client quits, the server will resume listening for
+ * additional clients. SIGINT (^C) Can be used to quit the program */ 
+
 #include "communication.h"
 #include "common.h"
 
@@ -37,14 +43,18 @@ int main(int argc, char** argv){
 
 void config(uint16_t *port, char *uname){
 	char portstr[6];
+	int port_test;
+
 	while(1){
+		/* macro size + 1 to accomodate the newline and null bit */ 
 		printf("Enter a username (16 chars max): ");
 		if(psgets(uname, UNAME_SIZE + 1) < 0) continue;
-		printf("Enter port number: ");
+		printf("Enter port number (Leave blank for any port): ");
 		if(psgets(portstr, PORT_SIZE + 1) < 0 || 
-			(*port = parse_port(portstr))
-					< 0) continue;
+			(port_test =  parse_port(portstr)) < 0) continue;
 		break;
 	}
+
+	*port = (uint16_t) port_test;
 	strtok(uname, "\n");
 }

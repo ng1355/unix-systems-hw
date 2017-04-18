@@ -1,3 +1,5 @@
+/* By Nikita Georgiou */ 
+
 #include "common.h"
 
 extern char *PROGRAM_NAME;
@@ -13,6 +15,6 @@ int psgets(char *buf, size_t size){
 
 	/* this prevents subsequent calls to psgets from reading unread input
 	 * ie, input in an initial call that exceeds buffer length */ 
-	fpurge(stdin);
+	__fpurge(stdin); /* Linux doesnt support fpurge? */ 
 	return strnlen(readstr, size);
 }
