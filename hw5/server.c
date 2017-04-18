@@ -18,7 +18,7 @@ int main(int argc, char** argv){
 
 	int sock, clientsock;
 	uint16_t port;
-	char uname[UNAME_SIZE];
+	char uname[UNAME_SIZE + 1];
 
 	/* configure settings from command line */ 
 	config(&port, uname);
@@ -42,7 +42,7 @@ int main(int argc, char** argv){
 }
 
 void config(uint16_t *port, char *uname){
-	char portstr[7];
+	char portstr[PORT_SIZE + PAD];
 	int port_test;
 
 	while(1){

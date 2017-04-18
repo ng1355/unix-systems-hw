@@ -15,7 +15,7 @@ int main(int argc, char** argv){
 	PROGRAM_NAME = argv[0];
 
 	int sock;
-	char ip[ADDR_SIZE], uname[UNAME_SIZE];
+	char ip[ADDR_SIZE + 1], uname[UNAME_SIZE + 1];
 	uint16_t  port;
 	/* read username, ip, and port from user */
 	config(ip, &port, uname);
@@ -29,7 +29,7 @@ int main(int argc, char** argv){
 }
 
 void config(char *addr, uint16_t *port, char *uname){
-	char portstr[7];
+	char portstr[PORT_SIZE + PAD];
 	int port_test;
 	while(1){
 		printf("Enter a username (16 chars max): ");
@@ -47,6 +47,7 @@ void config(char *addr, uint16_t *port, char *uname){
 	}
 
 	*port = (uint16_t) port_test;
+	/* uname and addr are guarinteed to be chopped down to macro + 1 here */
 	strtok(uname, "\n");
 	strtok(addr, "\n");
 
