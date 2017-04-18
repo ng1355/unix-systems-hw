@@ -43,7 +43,6 @@ void chat(int sock, char *uname){
 
 int read_from_client(int sock, char *msg, size_t size){
 	int bytesread;
-	__fpurge(stdin); /* apparently Linux doesn't suport fpurge? */ 
 
 	if((bytesread = read(sock, msg, size)) == 0){
 		/* the connection has been terminated nicely by the client */

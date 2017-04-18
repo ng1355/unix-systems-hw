@@ -5,7 +5,6 @@
 #define NIKITA_COMMUNICATION_H
 
 #include <stdio.h>
-#include <stdio_ext.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -60,7 +59,7 @@ int parse_port(char*);
  * send size includes username size and prompt formatting. */ 
 void chat(int, char*);
 
-/* purges stdin and reads from the given socket fd into the provided
+/* reads from the given socket fd into the provided
  * char buffer up to size bytes. Prints error messages and also handles
  * shutting down the socket fd on failure. Returns 0 on success and -1
  * on failure. */ 

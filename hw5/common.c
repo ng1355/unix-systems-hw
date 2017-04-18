@@ -13,8 +13,7 @@ int psgets(char *buf, size_t size){
 		return -1;
 	}
 
-	/* this prevents subsequent calls to psgets from reading unread input
-	 * ie, input in an initial call that exceeds buffer length */ 
-	__fpurge(stdin); /* Linux doesnt support fpurge? */ 
+	/* TODO: Reimpliment fpurge */ 
 	return strnlen(readstr, size);
 }
+

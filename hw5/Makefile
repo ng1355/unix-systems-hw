@@ -21,6 +21,6 @@ common.o: common.c
 	gcc ${FLAGS} -D_POSIX_C_SOURCE=200809L -Ofast -c common.c
 
 clean:
-	rm -f server d_server *.o
+	rm -f server client *.o
 cleanobj: 
 	rm -f *.o

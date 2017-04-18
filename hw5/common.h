@@ -4,7 +4,6 @@
 #define NIKITA_COMMON_H
 
 #include <stdio.h>
-#include <stdio_ext.h> /* __fpurge */ 
 #include <string.h>
 
 /* Reads input from stdin into buf of up to size bytes. Input longer
@@ -12,5 +11,6 @@
  * Returns the number of bytes read, or -1 on error. Also prints error msg
  * on error. Purges stdin */ 
 int psgets(char*, size_t);
+void spurge(FILE *stream);
 
 #endif
