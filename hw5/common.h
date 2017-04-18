@@ -11,6 +11,10 @@
  * Returns the number of bytes read, or -1 on error. Also prints error msg
  * on error. Purges stdin */ 
 int psgets(char*, size_t);
+
+/* currently unimplimented. fpurge is really useful for clearing backed-up
+ * out of bounds input for functions like psgets, but isnt portable.
+ * need to find a way to do this */ 
 void spurge(FILE *stream);
 
 #endif
