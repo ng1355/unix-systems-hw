@@ -36,6 +36,9 @@ void config(char *addr, uint16_t *port, char *uname){
 		printf("Enter an IPv4 address (Leave blank for localhost): ");
 		if(psgets(addr, UNAME_SIZE + 1) < 0) continue;
 		printf("Enter port number: ");
+		/* while leaving the port field blank is not invalid like
+		 * in the server, unlike the server its almost guarinteed to 
+		 * fail to connect to something */ 
 		if(psgets(portstr, PORT_SIZE + 1) < 0 ||
 				(port_test =  parse_port(portstr)) < 0)
 			continue;
