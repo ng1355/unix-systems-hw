@@ -42,7 +42,7 @@ int main(int argc, char** argv){
 }
 
 void config(uint16_t *port, char *uname){
-	char portstr[6];
+	char portstr[7];
 	int port_test;
 
 	while(1){

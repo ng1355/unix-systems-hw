@@ -29,7 +29,7 @@ int main(int argc, char** argv){
 }
 
 void config(char *addr, uint16_t *port, char *uname){
-	char portstr[6];
+	char portstr[7];
 	int port_test;
 	while(1){
 		printf("Enter a username (16 chars max): ");
@@ -40,7 +40,7 @@ void config(char *addr, uint16_t *port, char *uname){
 		/* while leaving the port field blank is not invalid like
 		 * in the server, unlike the server its almost guarinteed to 
 		 * fail to connect to something */ 
-		if(psgets(portstr, PORT_SIZE + PAD) < 0 ||
+		if(psgets(portstr, PORT_SIZE + 2) < 0 ||
 				(port_test =  parse_port(portstr)) < 0)
 			continue;
 		break;
