@@ -10,21 +10,32 @@
 const char *PROGRAM_NAME;
 extern int errno;
 
-void config(uint16_t *port, char *uname);
-
 int main(int argc, char** argv){
-	(void) argc; 
 	PROGRAM_NAME = argv[0];
 
 	int sock, clientsock;
-	uint16_t port;
-	char uname[UNAME_SIZE + 1];
+	uint16_t port = 0;
+	char uname[UNAME_SIZE];
 
-	/* configure settings from command line */ 
-	config(&port, uname);
+	switch(argc){
+		case 3:
+			if((port = parse_port(argv[2])) < 1)
+				exit(EXIT_FAILURE);
+		case 2: 
+			if(strnlen(strncpy(uname, argv[1], UNAME_SIZE - 1),
+				UNAME_SIZE) < strnlen(argv[1], UNAME_SIZE + 1))
+				fprintf(stderr, "Username truncated to %s\n",
+						uname);
+			break;
+		default:
+			fprintf(stderr, "Usage: username [port]\n");
+			exit(EXIT_FAILURE);
+	}
 
 	/* set up sockety stuff */ 
-	if((sock = server_socket_setup(port)) < 0) exit(EXIT_FAILURE);
+	if((sock = server_socket_setup(&port)) < 0) exit(EXIT_FAILURE);
+
+	printf("Listening on port %d...\n", port);
 
 	if(listen(sock, BACKLOG_MAX) < 0){
 		fprintf(stderr, "%s: failed to listen\n", PROGRAM_NAME);
@@ -37,24 +48,7 @@ int main(int argc, char** argv){
 		puts("Waiting for connections...");
 		if((clientsock = establish_client(sock)) < 0) exit(EXIT_FAILURE);
 		puts("Connection accepted! You are now chatting.");
+		puts("Type \":dc\" to disconnect");
 		chat(clientsock, uname);
 	}
-}
-
-void config(uint16_t *port, char *uname){
-	char portstr[PORT_SIZE + PAD];
-	int port_test;
-
-	while(1){
-		/* PAD to accomodate the newline and null bit */ 
-		printf("Enter a username (16 chars max): ");
-		if(psgets(uname, UNAME_SIZE + PAD) < 0) continue;
-		printf("Enter port number (Leave blank for any port): ");
-		if(psgets(portstr, PORT_SIZE + PAD) < 0 || 
-			(port_test =  parse_port(portstr)) < 0) continue;
-		break;
-	}
-
-	*port = (uint16_t) port_test;
-	strtok(uname, "\n");
 }

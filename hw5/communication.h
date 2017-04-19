@@ -14,6 +14,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+#define CHAT_DC -1 /* chat control, tells the chat to close the sock and return */
 #define UNAME_SIZE 16 /* arbitrary, username length */
 #define ADDR_SIZE 15 /* abc.def.ghi.jkl = 15 */
 #define PORT_SIZE 5 /* 2 byte number can have up to 5 digits (see PORT_MAX) */
@@ -23,14 +24,25 @@
 #define MSG_MAX 256 /* arbitrary, for message length, incl. uname + formatting */
 
 /* ***************************************************************************
+ * the following are control functions that change how the chat operates
+ * internally, local to the user
+ * **************************************************************************/
+
+/* if the user begins a message with ':', all following input will be parsed
+ * as a chat command. The returned int defines what the chat should do next */
+int chat_control(char *msg);
+
+/* ***************************************************************************
  * The following functions establish socket stuff, create structs, etc. 
  * necessary for communication
  * **************************************************************************/
 
-/* takes a port and binds a socket for a server to listen on. Socket is of
+/* takes a port ptr and binds a socket for a server to listen on. Socket is of
  * type IPv4 and TCP, running on any address (INADDR_ANY). Returns socket fd
- * or -1 on error. */ 
-int server_socket_setup(uint16_t);
+ * or -1 on error. Note that the passed port is modified by the function
+ * so that, in the case 0 is passed, the bound port number can be echoed by the
+ * caller */ 
+int server_socket_setup(uint16_t*);
 
 /* creates a socket fd bound to TCP connected IPv4 address ip through
  * port port. Returns socket fd or -1 on error, printing error messages */ 
@@ -43,12 +55,9 @@ int establish_client(int);
 
 /* takes a port number as a char* and parses it into an int. The port is
  * then checked to be within the range of an unsigned 16 bit number, returning 
- * -1 if not. Non-numeric chars are ignored. If the provided string is  
- * unparseable (no numeric chars), then the function fails, returning -1. 
- * Note that the return type is expected to be checked by the caller for -1
- * before safely being cast into something like a uint16_t, as non-erronious
- * returns are guarinteed to be within this range. */ 
-int parse_port(char*);
+ * 0 if not. Non-numeric chars are ignored. If the provided string is  
+ * unparseable (no numeric chars), then the function fails, returning 0. */
+uint16_t  parse_port(char*);
 
 /* ***************************************************************************
  * The following functions deal with sending and recieving data
@@ -65,10 +74,11 @@ void chat(int, char*);
  * on failure. */ 
 int read_from_client(int, char*, size_t);
 
-/* flushes stdout. this creates a formatted message where the sender's
- * username is appended to the beginning of the message. Internally
+/* this creates a formatted message where the sender's username 
+ * is appended to the beginning of the message. Internally
  * handles shutting down sockets on communicate failure. Returns 0 on
- * success and -1 on failure */ 
-int send_to_client(int, char*, char*, size_t);
+ * success and -1 on failure. Reads up to at most MSG_MAX characters, including
+ * username and formatting length. Longer messages are truncated */ 
+int send_to_client(int, char*, char*);
 
 #endif

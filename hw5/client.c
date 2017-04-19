@@ -8,49 +8,52 @@
 
 const char *PROGRAM_NAME;
 
-void config(char *addr, uint16_t *port, char *uname);
-
 int main(int argc, char** argv){
 	(void) argc;
 	PROGRAM_NAME = argv[0];
 
 	int sock;
-	char ip[ADDR_SIZE + 1], uname[UNAME_SIZE + 1];
-	uint16_t  port;
-	/* read username, ip, and port from user */
-	config(ip, &port, uname);
+	/* ADDR + 1 to accomodate null */
+	char ip[ADDR_SIZE + 1], uname[UNAME_SIZE];
+	uint16_t port = 0; /* an optional port is odd... */
+	strcpy(ip, "127.0.0.1"); /* copy of literal so should be safe */
+
+	/* TODO: refactor
+	 * Allows an optional port and IP, in either order. IPs are 
+	 * understood as having periods. the check for "localhost"
+	 * is a nop as ip begins as localhost */ 
+	switch(argc){
+		case 4: 
+			if(strchr(argv[3], '.') != NULL)
+				strncpy(ip, argv[3], ADDR_SIZE + 1);
+			else if(strncmp(argv[3], "localhost", 9) == 0);
+			else{
+				if((port = parse_port(argv[3])) < 1)
+					exit(EXIT_FAILURE);
+			}
+		case 3:
+			if(strchr(argv[2], '.') != NULL)
+				strncpy(ip, argv[2], ADDR_SIZE + 1);
+			else if(strncmp(argv[2], "localhost", 9) == 0);
+			else{
+				if((port = parse_port(argv[2])) < 1)
+					exit(EXIT_FAILURE);
+			}
+		case 2: 
+			if(strnlen(strncpy(uname, argv[1], UNAME_SIZE - 1),
+				UNAME_SIZE) < strnlen(argv[1], UNAME_SIZE + 1))
+				fprintf(stderr, "Username truncated to %s\n",
+						uname);
+			break;
+		default:
+			fprintf(stderr, "Usage: username [addr | port]\n");
+			exit(EXIT_FAILURE);
+	}
+
 	/* set up socket to connect to server */ 
 	if((sock = client_socket_setup(ip, port)) < 0) exit(EXIT_FAILURE);
 
 	/* send msg to server from stdin, echo own msg & other msgs to stdout */
-	puts("Connected, happy chatting!");
-	//getchar();
+	puts("Connected, happy chatting!\n Type \":dc\" to disconnect");
 	chat(sock, uname);
-}
-
-void config(char *addr, uint16_t *port, char *uname){
-	char portstr[PORT_SIZE + PAD];
-	int port_test;
-	while(1){
-		printf("Enter a username (16 chars max): ");
-		if(psgets(uname, UNAME_SIZE + PAD) < 1) continue;
-		printf("Enter an IPv4 address (Leave blank for localhost): ");
-		if(psgets(addr, ADDR_SIZE + PAD) < 0) continue;
-		printf("Enter port number: ");
-		/* while leaving the port field blank is not invalid like
-		 * in the server, unlike the server its almost guarinteed to 
-		 * fail to connect to something */ 
-		if(psgets(portstr, PORT_SIZE + 2) < 0 ||
-				(port_test =  parse_port(portstr)) < 0)
-			continue;
-		break;
-	}
-
-	*port = (uint16_t) port_test;
-	/* uname and addr are guarinteed to be chopped down to macro + 1 here */
-	strtok(uname, "\n");
-	strtok(addr, "\n");
-
-	if(strncmp(addr, "localhost", 9) == 0 || addr[0] == '\n')
-		strncpy(addr, "127.0.0.1", 10);
 }
