@@ -9,10 +9,10 @@ client: client.o communication.o common.o
 	gcc client.o communication.o common.o -o client
 
 client.o: client.c
-	gcc ${FLAGS} -Ofast -c client.c
+	gcc ${FLAGS} -D_POSIX_C_SOURCE=200809L -Ofast -c client.c
 
 server.o: server.c 
-	gcc ${FLAGS} -Ofast -c server.c
+	gcc ${FLAGS} -D_POSIX_C_SOURCE=200809L -Ofast -c server.c
 
 communication.o: communication.c
 	gcc ${FLAGS} -D_POSIX_C_SOURCE=200112L -Ofast -c communication.c

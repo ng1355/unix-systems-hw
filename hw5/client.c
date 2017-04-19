@@ -2,6 +2,7 @@
  * Asks user for an ip and port to connect to. Can then exchange messages
  * with a server. Can be quit with ^C */ 
 #include <stdio.h>
+#include <string.h>
 #include <sys/socket.h>
 #include "communication.h"
 #include "common.h"

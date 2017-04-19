@@ -6,6 +6,7 @@
 
 #include "communication.h"
 #include "common.h"
+#include <string.h>
 
 const char *PROGRAM_NAME;
 extern int errno;
