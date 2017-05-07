@@ -28,9 +28,8 @@
 /* when a client joins a server, they're given a list of currently
  * connected users. The size of the buffer to hold this info is
  * therefor at an upper bound of the max number of connected users
- * times the max username size. The 50 is arbitrary padding in case
- * flavor text (eg. "Connected users: ") is also provided */ 
-#define UNAMELIST_SIZE (MAX_CONN * UNAME_SIZE) + 50 
+ * times the max username size. */
+#define UNAMELIST_SIZE (MAX_CONN * UNAME_SIZE) + sizeof("Users online: \n")
 
 /* ***************************************************************************
  * the following are control functions that change how the chat operates
@@ -41,8 +40,10 @@
  * as a chat command. The returned int defines what the chat should do next */
 int chat_control(char *msg);
 
+/* sends username to server as part of handshake */ 
 void send_uname(int sock, char *uname);
 
+/* recieves formatted list of users online from server, completing handshake */
 void recv_unamelist(int sock, char *userlist);
 
 /* ***************************************************************************

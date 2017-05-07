@@ -17,11 +17,12 @@ int main(int argc, char** argv){
 	uint16_t port = 0;
 	sigset_t set;
 	pthread_t accepter_th, mcast_th, sig_th;
+	pthread_mutex_t barrier_lk;
 
 	/* init mutexes */ 
 	if(pthread_mutex_init(queue_lk, NULL) != 0 || 
 			pthread_mutex_init(users_lk, NULL) != 0 ||
-			pthread_mutex_init(flag_lk, NULL) != 0)
+			pthread_mutex_init(&barrier_lk, NULL) != 0)
 		eperror();
 
 	/* init pthread attribute  to detach on creation */ 
@@ -30,6 +31,7 @@ int main(int argc, char** argv){
 
 	/* init condition variable for multicasting */ 
 	pthread_cond_init(&msg_exists, NULL);
+	pthread_cond_init(&barrier_chk, NULL);
 
 	/* ignore SIGPIPE */ 
 	sigemptyset(&set);
@@ -46,8 +48,7 @@ int main(int argc, char** argv){
 
 	if(listen(sock, BACKLOG_MAX) < 0) eperror();
 
-
-	/* have one thread handle all sigstops */ 
+	/* have one thread handle all sigpipes */ 
 	if(pthread_create(&sig_th, &detach, ignore_sigstop, &set) != 0)
 		eperror();
 
@@ -64,16 +65,34 @@ int main(int argc, char** argv){
 	getchar();
 	puts("shutting down server...");
 	
-	/* no error checks since there's nothing to recover to */ 
-	SHUTDOWN_SERVER();
+	pthread_cancel(sig_th); /* sigwait is cancel point */ 
+	pthread_cancel(accepter_th); /* accept */ 
+	pthread_cancel(mcast_th); /* cond_wait */ 
+	/* all other threads exit when they "see" their user has disconnected */ 
 
+	/* removes all users from user_list and closes their connections
+	 * this will cause any remaining client_handler threads to exit */
 	empty_userlist();
 
+	/* verbose considering barrier is already atomic, but will block the 
+	 * main thread until barrier is 0, ie all client_handlers are exited. 
+	 * This is done so all mutex may be safely destroyed without 
+	 * invoking undefined behavior when the client_handlers call their
+	 * own cleanup routines, which lock users_lk */ 
+	pthread_mutex_lock(&barrier_lk);
+	while(barrier != 0)
+		pthread_cond_wait(&barrier_chk, &barrier_lk);
+	pthread_mutex_unlock(&barrier_lk);
+
+	/* only the main thread should exist by this point, making all 
+	 * deletion safe */ 
 	pthread_mutex_destroy(queue_lk);
 	pthread_mutex_destroy(users_lk);
+	pthread_mutex_destroy(&barrier_lk);
 	pthread_cond_destroy(&msg_exists);
 	pthread_attr_destroy(&detach);
 
+	/* should be deleted already but just in case */ 
 	free(queued_msg.msg);
 }
 
@@ -87,9 +106,11 @@ void *ignore_sigstop(void *arg){
 }
 
 void empty_userlist(){
+	pthread_mutex_lock(users_lk);
 	for(int i = 0; i < MAX_CONN; i++)
 		if(user_list[i] != NULL)
 			remove_user(i);
+	pthread_mutex_unlock(users_lk);
 }
 
 void parse_args(int argc, char **argv, uint16_t *port){
@@ -105,31 +126,35 @@ void parse_args(int argc, char **argv, uint16_t *port){
 
 void * accept_clients(void *arg){
 	int sock = *((int *) arg);
-	int *clientsock;
+	int clientsock;
+	int *csock_addr;
 	pthread_t chatter_th;
 
 	while(1){
-		CHECK_FLAG();
-
 		/* passing a stack pointer or any static memory address
 		 * risks a race condition across thread creation, as by the 
 		 * time one thread executes client_handler, any local or
 		 * static address from here may be overwritten. */ 
-		if((clientsock = malloc(sizeof(int))) == NULL){
-			perror("Failed to malloc a client socket");
-			continue;
-		}
-		if((*clientsock = establish_client(sock)) < 0){
+		if((clientsock = establish_client(sock)) < 0){
 			perror("Failed to accept client");
-			free(clientsock);
 			continue;
 		}
 
-		if(pthread_create(&chatter_th, &detach, client_handler,
-						clientsock) != 0){
-			perror("Failed to spawn thread for client");
-			shutdown(*clientsock, SHUT_RDWR);
+		/* accept is cancellation point, so only allocate once
+		 * we have a socket */ 
+		if((csock_addr = malloc(sizeof(int))) == NULL){
+			fprintf(stderr, "%s: Failed to allocate memory"
+					" for socket\n", PROGRAM_NAME);
+			continue;
 		}
+
+		*csock_addr = clientsock;
+
+		if(pthread_create(&chatter_th, &detach, client_handler,
+						csock_addr) != 0){
+			perror("Failed to spawn thread for client");
+			shutdown(clientsock, SHUT_RDWR);
+		} 
 	}
 	return NULL;
 }
@@ -174,10 +199,15 @@ void *client_handler(void *sock){
 		return NULL;
 	}
 
+	/* thread is only truly considered "active" and part of the barrier
+	 * when the user has been added to the list. ie, when the user
+	 * has to be removed by a call to remove_user() */ 
+	++barrier;
+
 	/* give the user a list of online users, this completes handshake */ 
 	if(send_unamelist(client_id, &client) != 0){
-		pthread_mutex_unlock(users_lk);
 		remove_user(client_id);
+		pthread_mutex_unlock(users_lk);
 		return NULL;
 	}
 
@@ -188,11 +218,12 @@ void *client_handler(void *sock){
 
 	/* block on user input, queueing any messages recieved for multicasting */
 	while(1){
-		CHECK_FLAG();
 		memset(msg, 0, MSG_MAX);
 		if(read_from_client(client.sock, msg, MSG_MAX) != 0){
 			/* user is unreachable, ie. offline */ 
+			pthread_mutex_lock(users_lk);
 			remove_user(client_id);
+			pthread_mutex_unlock(users_lk);
 			return NULL;
 		}
 		queue_msg(client_id, msg);
@@ -225,17 +256,22 @@ int send_unamelist(int client_id, user_t *client){
 }
 
 /* in all contexts this function is called, the user's thread 
- * is guarinteed to be alive until it returns */ 
+ * is guarinteed to be alive until remove_user returns. 
+ * Note that this function is idempotent. This is required during server
+ * shutdown as client_handler threads will run this even though empty_userlist
+ * has removed all users */ 
 void remove_user(int user_id){
+	if(user_list[user_id] == (user_t *) NULL) return;
+
 	char logoff[UNAME_SIZE + sizeof(" logged off")];
 
-	pthread_mutex_lock(users_lk);
 	shutdown(user_list[user_id]->sock, SHUT_RDWR);
 	snprintf(logoff, sizeof(logoff), "%s logged off", 
 			user_list[user_id]->uname);
 	user_list[user_id] = (user_t *) NULL;
+	--barrier;
+	pthread_cond_signal(&barrier_chk); /* nop if server isn't shutting down */
 	multicast(SERVER_MSG, logoff);
-	pthread_mutex_unlock(users_lk);
 }
 
 void queue_msg(int client_id, char *msg){
@@ -255,7 +291,6 @@ void queue_msg(int client_id, char *msg){
 
 void *multicaster(){
 	while(1){
-		CHECK_FLAG();
 		pthread_mutex_lock(queue_lk);
 
 		while(queued_msg.msg == (char *) NULL)

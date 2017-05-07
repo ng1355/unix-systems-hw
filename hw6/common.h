@@ -13,11 +13,14 @@
 /* prints program name & corresponding error. Terminates the program. */ 
 #define eperror() { perror(PROGRAM_NAME); exit(EXIT_FAILURE); }
 
+#define bzero(buf, size) memset((buf), 0, (size))
+
 /* Reads input from stdin into buf of up to size bytes. Input longer
  * than size is truncated to size - 1 (excluding null terminator).
  * Returns the number of bytes read, or -1 on error. Also prints error msg
  * on error. */ 
 int psgets(char*, size_t);
+
 
 /* polls on fd fdno, consuming any remaining characters in the file descriptor
  * this in effect purges the stream. Poll has no failure cases here short of 

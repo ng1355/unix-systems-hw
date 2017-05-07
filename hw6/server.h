@@ -2,6 +2,7 @@
 #define _SERVER_H
 
 #include "communication.h"
+#include <signal.h>
 
 /* client_id for messages sent from the server itself (eg. log offs).
  * multicasts using this send the msg to all clients */ 
@@ -19,21 +20,6 @@ struct msg_queue{
 	char *msg;
 };
 
-/* flag for thread loops to know when tobreak out and clean up 
- * initialized to 0 by static space */ 
-int SHUTDOWN_FLAG;
-
-/* macro functions to atomically check or set the shutdown flag */ 
-#define SHUTDOWN_SERVER() \
-	pthread_mutex_lock(flag_lk); \
-	SHUTDOWN_FLAG = 1; \
-	pthread_mutex_unlock(flag_lk);
-
-#define CHECK_FLAG() \
-	pthread_mutex_lock(flag_lk); \
-	if(SHUTDOWN_FLAG == 1) break; \
-	pthread_mutex_unlock(flag_lk);
-
 /* list of pointers to user struct. The list is not null terminated
  * and may have "NULL" holes */ 
 user_t *user_list[MAX_CONN]; 
@@ -44,18 +30,24 @@ struct msg_queue queued_msg;
 
 pthread_mutex_t queue_lock; /* mutex for accessing the message queue */ 
 pthread_mutex_t users_lock; /* mutex for accessing user_list */ 
-pthread_mutex_t flag_lock; /* used for accessing shutdown flag */ 
 
 /* a little heretical to have in a header but its convenient */ 
 pthread_mutex_t *queue_lk = &queue_lock;
 pthread_mutex_t *users_lk = &users_lock;
-pthread_mutex_t *flag_lk = &flag_lock;
-
 
 pthread_attr_t detach; /* skips having to call pthread_detach() */ 
 
 /* multicast() blocks until there's a message to multicast */
 pthread_cond_t msg_exists;
+
+/* used for cleanup. sig_atomic_t is a macro for int, which is interestingly
+ * guarinteed to be atomic on POSIX systems. Used to avoid having to lock
+ * barrier */ 
+sig_atomic_t barrier;
+
+/* Main thread will wait on this after the server begins shutting down. 
+ * Waits for all user threads to exist before destroying mutexes, etc. */ 
+pthread_cond_t barrier_chk;
 
 /* *** server functions *** */ 
 
@@ -84,7 +76,7 @@ void *client_handler(void *user_id);
 
 /* Removes a user from the queue by shutting down their socket and setting 
  * their pointer in the user_list to NULL. Multicasts that the user has
- * logged off. Locks user_list */ 
+ * logged off. Does not lock  user_list */ 
 void remove_user(int user_id);
 
 /* Configures msg_queue with a client id and uses strdup to clone msg
@@ -100,7 +92,7 @@ void queue_msg(int client_id, char *msg);
 void *multicaster();
 
 /* Sends a message to all users except user_id. If user_id is SERVER_MSG,
- * then also echoes the message to the server's stdin. Does not lock user_list */ 
+ * then also echoes the message to the server's stdout. Does not lock user_list */ 
 void multicast();
 
 /* generates a formatted string displays all users currently connected,
