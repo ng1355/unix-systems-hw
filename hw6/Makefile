@@ -6,13 +6,13 @@ all: server client
 debug: server_debug client
 
 server: server.o communication.o common.o
-	gcc server.o communication.o common.o -o server
+	gcc -pthread server.o communication.o common.o -o server
 
 client: client.o communication.o common.o
 	gcc client.o communication.o common.o -o client
 
 server_debug: server_d.o communication.o common.o
-	gcc server.o communication.o common.o -o server
+	gcc -pthread server.o communication.o common.o -o server
 
 client.o: client.c
 	gcc ${FLAGS} -D_POSIX_C_SOURCE=200809L -Ofast -c client.c
