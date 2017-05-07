@@ -48,6 +48,9 @@ int main(int argc, char** argv){
 
 	if(listen(sock, BACKLOG_MAX) < 0) eperror();
 
+	/* even though these threads are detached, valgrind will sometimes
+	 * erroniously report a memory leak from their creation */ 
+
 	/* have one thread handle all sigpipes */ 
 	if(pthread_create(&sig_th, &detach, ignore_sigstop, &set) != 0)
 		eperror();
