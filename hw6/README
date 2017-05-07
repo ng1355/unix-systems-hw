@@ -1,0 +1,63 @@
+This server will accept multiple connections from different clients, 
+and allow them to talk to one another. The server itself will not participate
+in the conversation, but will print error messages, as well as when a user
+has logged in or off. 
+
+The server will first perform a number of initializtion routines for setting
+up various components:
+
+the mutexes: used to lock the user_list and msg_queue. these mutexes are global
+and can be accessed by any thread wishing to modify these resources. the
+barrier_lk mutex is redundant, but necessary for a barrier used during
+main's cleanup. 
+
+the pthread attribute: used to fire of detached threads without needing an
+explicit call to detach. This is initialized once, and therefor can be read from
+concurrently without invoking a lock. 
+
+the condition variables: msg_exists is used by the mullicaster function to 
+determine when there is a message ready to be multicast. the barrier_chk is used
+by the same barrier mentioned earlier. 
+
+After this, three main threads are spun up in a detached state: 
+The sigpipe thread, which consumes any blocked SIGPIPEs as to not terminate
+the program if write() fails. 
+
+the accepter thread, which runs forever accepting new connections from different
+clients, spawning threads of its own for each of them.
+
+the multicaster thread, which blocks when there isnt a message to multicast,
+and sends a message to multicast when there is.
+
+when the accepter thread gets a new connection, it mallocs a unique address
+for a new worker thread that will handle the connection to communicate through. 
+The new client_handler (worker) thread will free this memory immediately, 
+and proceed to perform the initial handshale of recieving a usernamd and sending
+the client list to the connected user. Once the thread places the user in the
+user_list, it incriments the barrier int. It will then block on a read from the ,
+client, putting any recieved messages on a queue to be multicast. If the read fails,
+the client is condsidered disconnecetd to is removed by a call to remove_user().
+
+messages are put on the queue by a call to queue_msg by a client_handler. 
+This function mallocs a copy of the message into a global buffer, and also
+provides the index in the user_list of the message sender so the multicast
+function does not echo the message back to the sender. 
+
+the multicaster thread blocks on a condition variable until signalled by a call
+to queue_msg (done by a client_handler after a successful read), at which point
+it will lock both the user and queue mutexes before multicasting the message. 
+While required by the spec, this function is somewhat redundant, as the threads
+could have directly called multicast() themselves. 
+
+The server can be shut down at any time by hitting enter. This will first cancel
+the "big three" threads described above (all have POSIX-compliant cancellation
+points), before emptying "user_list." The main thread will then block, waiting
+for the "barrier" int (which is atomic) to be decrimented to 0, meaning
+all "user handler" threads have terminated and it is safe to destruct
+the initialized mutexes, etc. mentioned earlier. 
+
+since empty_userlist calls remove_user() on all users still in the user_list,
+their sockets will shut down. This will cause all client_handlers to fail to
+read from those sockets, and themselves also call remove_user(). This is fine,
+as remove_user is idempotent and will do nothing if that index in the user_list
+is already NULL. 
