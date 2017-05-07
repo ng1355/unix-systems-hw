@@ -48,6 +48,9 @@ to queue_msg (done by a client_handler after a successful read), at which point
 it will lock both the user and queue mutexes before multicasting the message. 
 While required by the spec, this function is somewhat redundant, as the threads
 could have directly called multicast() themselves. 
+Multicasts made with the SERVER_MSG user_id are sent to everyone, and 
+echoed to the server's stdout. This is used for login/out, messages. This
+means a user will intentionally be alerted of themselves logging in. 
 
 The server can be shut down at any time by hitting enter. This will first cancel
 the "big three" threads described above (all have POSIX-compliant cancellation
